@@ -1,0 +1,1606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroJack — SSVEP BCI Slapjack</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap');
+
+  :root {
+    --bg: #080c0a;
+    --panel: #0d1410;
+    --border: #1a2e1e;
+    --green: #00ff6a;
+    --green-dim: #009940;
+    --green-glow: rgba(0,255,106,0.15);
+    --red: #ff3a3a;
+    --red-dim: #8b1a1a;
+    --amber: #ffb800;
+    --amber-glow: rgba(255,184,0,0.2);
+    --white: #e8f5ec;
+    --muted: #3a5244;
+    --card-bg: #1a1a2e;
+    --card-border: #2a2a4e;
+    --jack-gold: #ffd700;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--white);
+    height: 100vh;
+    overflow: hidden;
+    cursor: none;
+  }
+
+  /* Custom cursor */
+  #cursor {
+    position: fixed;
+    width: 12px; height: 12px;
+    border: 2px solid var(--green);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: border-color 0.1s;
+    mix-blend-mode: screen;
+  }
+  #cursor::after {
+    content: '';
+    position: absolute;
+    width: 3px; height: 3px;
+    background: var(--green);
+    border-radius: 50%;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+  }
+
+  /* Scanlines overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* CRT vignette */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.7) 100%);
+    pointer-events: none;
+    z-index: 99;
+  }
+
+  /* Layout */
+  #app {
+    display: grid;
+    grid-template-columns: 260px 1fr 300px;
+    grid-template-rows: 56px 1fr 180px;
+    height: 100vh;
+    gap: 0;
+  }
+
+  /* Header */
+  #header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(13,20,16,0.95);
+    backdrop-filter: blur(10px);
+    position: relative;
+    z-index: 10;
+  }
+
+  #logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 6px;
+    color: var(--green);
+    text-shadow: 0 0 20px var(--green), 0 0 40px rgba(0,255,106,0.3);
+  }
+
+  #logo span { color: var(--white); opacity: 0.4; font-size: 14px; letter-spacing: 2px; margin-left: 12px; font-family: 'Share Tech Mono', monospace; }
+
+  .header-stats {
+    display: flex;
+    gap: 32px;
+    align-items: center;
+  }
+
+  .stat-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .stat-label { font-size: 9px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; font-family: 'Share Tech Mono', monospace; }
+  .stat-value { font-family: 'Share Tech Mono', monospace; font-size: 22px; color: var(--green); text-shadow: 0 0 10px var(--green); }
+  .stat-value.amber { color: var(--amber); text-shadow: 0 0 10px var(--amber); }
+  .stat-value.red { color: var(--red); }
+
+  /* Left panel: EEG signal */
+  #left-panel {
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .panel-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #fft-canvas {
+    width: 100%;
+    height: 160px;
+    display: block;
+  }
+
+  .freq-bars {
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+  }
+
+  .freq-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .freq-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .freq-name {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .freq-hz {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    font-weight: bold;
+  }
+
+  .freq-hz.slap { color: var(--red); }
+  .freq-hz.idle { color: var(--green); }
+
+  .freq-bar-bg {
+    height: 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .freq-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.08s ease;
+  }
+
+  .freq-bar-fill.slap { background: linear-gradient(90deg, var(--red-dim), var(--red)); box-shadow: 0 0 8px var(--red); }
+  .freq-bar-fill.idle { background: linear-gradient(90deg, var(--green-dim), var(--green)); box-shadow: 0 0 8px var(--green); }
+
+  .confidence-section {
+    padding: 0 18px 18px;
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+  }
+
+  .confidence-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin: 12px 0 8px;
+  }
+
+  #confidence-meter {
+    height: 24px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    position: relative;
+  }
+
+  #confidence-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #003311, var(--green));
+    transition: width 0.1s ease;
+    position: relative;
+  }
+
+  #confidence-fill::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: white;
+    box-shadow: 0 0 8px white;
+  }
+
+  #confidence-value {
+    position: absolute;
+    right: 8px; top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--white);
+    mix-blend-mode: difference;
+  }
+
+  /* Center: game area */
+  #game-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  /* Grid lines background */
+  #game-area::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,106,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,106,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Card table */
+  #card-table {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  #deck-area {
+    display: flex;
+    gap: 40px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pile-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .card-stack {
+    position: relative;
+    width: 90px;
+    height: 126px;
+  }
+
+  .card-back {
+    position: absolute;
+    width: 90px; height: 126px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #1a1a4a, #0d0d2e);
+    border: 1px solid var(--card-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .card-back::after {
+    content: '♠';
+    font-size: 24px;
+    color: var(--card-border);
+  }
+
+  .card-back:nth-child(2) { transform: translate(2px, 2px); }
+  .card-back:nth-child(3) { transform: translate(4px, 4px); }
+
+  /* Active/flipped card */
+  #active-card {
+    width: 110px; height: 154px;
+    border-radius: 10px;
+    background: #f5f0e8;
+    border: 2px solid rgba(255,255,255,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    font-family: 'Bebas Neue', sans-serif;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.1);
+    transition: transform 0.15s ease;
+    transform-style: preserve-3d;
+  }
+
+  #active-card.flip {
+    animation: cardFlip 0.3s ease;
+  }
+
+  @keyframes cardFlip {
+    0% { transform: rotateY(0deg) scale(1); }
+    50% { transform: rotateY(90deg) scale(0.95); }
+    100% { transform: rotateY(0deg) scale(1); }
+  }
+
+  #active-card.jack {
+    background: #fff8e1;
+    box-shadow: 0 0 60px var(--jack-gold), 0 0 120px rgba(255,215,0,0.3), inset 0 1px 1px rgba(255,255,255,0.5);
+    animation: jackPulse 0.5s ease infinite alternate;
+  }
+
+  @keyframes jackPulse {
+    0% { box-shadow: 0 0 40px var(--jack-gold), 0 0 80px rgba(255,215,0,0.4); }
+    100% { box-shadow: 0 0 80px var(--jack-gold), 0 0 160px rgba(255,215,0,0.6); }
+  }
+
+  .card-rank {
+    font-size: 52px;
+    line-height: 1;
+    color: #1a1a1a;
+  }
+
+  .card-rank.red-suit { color: #c0392b; }
+
+  .card-suit {
+    font-size: 32px;
+    line-height: 1;
+    color: #1a1a1a;
+  }
+
+  .card-suit.red-suit { color: #c0392b; }
+
+  .card-corner {
+    position: absolute;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1;
+    color: #1a1a1a;
+  }
+
+  .card-corner.red-suit { color: #c0392b; }
+  .card-corner.tl { top: 8px; left: 10px; }
+  .card-corner.br { bottom: 8px; right: 10px; transform: rotate(180deg); }
+
+  .card-corner-suit { font-size: 11px; }
+
+  /* Win pile indicator */
+  #win-count-display {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  /* Round timer */
+  #round-timer {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 80px;
+    line-height: 1;
+    color: var(--white);
+    letter-spacing: 4px;
+    text-shadow: 0 0 30px rgba(255,255,255,0.1);
+    position: absolute;
+    right: 24px; bottom: 24px;
+    opacity: 0.08;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  /* Jack overlay */
+  #jack-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  #jack-overlay.visible { opacity: 1; }
+
+  #jack-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 96px;
+    letter-spacing: 16px;
+    color: var(--jack-gold);
+    text-shadow: 0 0 40px var(--jack-gold), 0 0 80px rgba(255,215,0,0.6);
+    animation: jackBounce 0.3s ease infinite alternate;
+  }
+
+  @keyframes jackBounce {
+    0% { transform: scale(1) rotate(-1deg); }
+    100% { transform: scale(1.04) rotate(1deg); }
+  }
+
+  /* Slap feedback */
+  #slap-feedback {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+  }
+
+  #slap-feedback.win {
+    animation: slapWin 0.5s ease forwards;
+    background: radial-gradient(ellipse at center, rgba(0,255,106,0.2) 0%, transparent 70%);
+  }
+
+  #slap-feedback.lose {
+    animation: slapLose 0.5s ease forwards;
+    background: radial-gradient(ellipse at center, rgba(255,58,58,0.25) 0%, transparent 70%);
+  }
+
+  @keyframes slapWin {
+    0% { opacity: 0; transform: scale(0.8); }
+    30% { opacity: 1; transform: scale(1.05); }
+    100% { opacity: 0; transform: scale(1.1); }
+  }
+  @keyframes slapLose {
+    0% { opacity: 0; }
+    30% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  #slap-word {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 72px;
+    letter-spacing: 12px;
+  }
+
+  #slap-word.win { color: var(--green); text-shadow: 0 0 40px var(--green); }
+  #slap-word.lose { color: var(--red); text-shadow: 0 0 40px var(--red); }
+
+  /* Bottom: SSVEP stimulus bar */
+  #stimulus-bar {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stimulus-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.05s;
+  }
+
+  #stim-idle {
+    border-right: 1px solid var(--border);
+  }
+
+  .stim-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 40px;
+    letter-spacing: 8px;
+    position: relative;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  #stim-idle .stim-label { color: var(--green); text-shadow: 0 0 20px var(--green); }
+  #stim-slap .stim-label { color: var(--red); text-shadow: 0 0 20px var(--red); }
+
+  .stim-freq {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    position: relative;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  #stim-idle .stim-freq { color: var(--green-dim); }
+  #stim-slap .stim-freq { color: var(--red-dim); }
+
+  .stim-hint {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    position: absolute;
+    bottom: 12px;
+    letter-spacing: 1px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Flicker overlay within stimulus */
+  .flicker-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  #stim-idle .flicker-layer { background: var(--green-glow); }
+  #stim-slap .flicker-layer { background: rgba(255,58,58,0.12); }
+
+  /* Center divider in stimulus */
+  .stim-center {
+    width: 2px;
+    background: var(--border);
+    align-self: stretch;
+  }
+
+  /* Log panel */
+  #log-panel {
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #log-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #log-list::-webkit-scrollbar { width: 3px; }
+  #log-list::-webkit-scrollbar-track { background: transparent; }
+  #log-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .log-item {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    position: relative;
+    overflow: hidden;
+    animation: logSlide 0.2s ease;
+  }
+
+  @keyframes logSlide {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .log-item::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+
+  .log-item.win::before { background: var(--green); }
+  .log-item.lose::before { background: var(--red); }
+  .log-item.miss::before { background: var(--muted); }
+  .log-item.info::before { background: var(--amber); }
+
+  .log-round { color: var(--muted); font-size: 10px; margin-bottom: 4px; }
+  .log-event { color: var(--white); margin-bottom: 3px; }
+  .log-rt { font-size: 11px; }
+  .log-rt.win { color: var(--green); }
+  .log-rt.lose { color: var(--red); }
+  .log-rt.miss { color: var(--muted); }
+
+  /* Overlay screens */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8,12,10,0.97);
+    backdrop-filter: blur(20px);
+  }
+
+  .overlay-card {
+    max-width: 560px;
+    width: 90%;
+    text-align: center;
+    padding: 48px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--panel);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .overlay-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+  }
+
+  .overlay-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 64px;
+    letter-spacing: 10px;
+    color: var(--green);
+    text-shadow: 0 0 40px var(--green);
+    margin-bottom: 8px;
+  }
+
+  .overlay-subtitle {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  .overlay-desc {
+    color: rgba(232,245,236,0.6);
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 36px;
+  }
+
+  .overlay-desc strong { color: var(--white); }
+
+  .btn {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 6px;
+    padding: 14px 48px;
+    border: 1px solid var(--green);
+    background: transparent;
+    color: var(--green);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-shadow: 0 0 10px var(--green);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--green-glow);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .btn:hover::before { opacity: 1; }
+  .btn:hover { box-shadow: 0 0 20px var(--green-glow), 0 0 40px var(--green-glow); }
+  .btn:active { transform: scale(0.98); }
+
+  .key-badge {
+    display: inline-block;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--muted);
+    margin: 0 2px;
+    background: rgba(255,255,255,0.03);
+  }
+
+  /* Calibration progress */
+  #cal-bar-outer {
+    height: 6px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 3px;
+    margin: 20px 0 8px;
+    overflow: hidden;
+  }
+
+  #cal-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--green);
+    border-radius: 3px;
+    transition: width 0.1s linear;
+    box-shadow: 0 0 8px var(--green);
+  }
+
+  #cal-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  #cal-countdown {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 80px;
+    color: var(--green);
+    text-shadow: 0 0 30px var(--green);
+    margin: 16px 0;
+  }
+
+  #cal-phase {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--white);
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+
+  /* Deck count badge */
+  .deck-count {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* SSVEP reaction window */
+  #reaction-ring {
+    position: absolute;
+    width: 130px; height: 154px;
+    border: 3px solid transparent;
+    border-radius: 14px;
+    pointer-events: none;
+    z-index: 5;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+  }
+
+  #reaction-ring.active {
+    display: block;
+    border-color: var(--jack-gold);
+    box-shadow: 0 0 20px var(--jack-gold), inset 0 0 20px rgba(255,215,0,0.1);
+    animation: ringPulse 0.3s ease infinite alternate;
+  }
+
+  @keyframes ringPulse {
+    0% { box-shadow: 0 0 10px var(--jack-gold); }
+    100% { box-shadow: 0 0 30px var(--jack-gold), inset 0 0 20px rgba(255,215,0,0.15); }
+  }
+
+  /* Penalty indicator */
+  #penalty-flash {
+    position: fixed;
+    inset: 0;
+    background: rgba(255,58,58,0.12);
+    pointer-events: none;
+    z-index: 150;
+    opacity: 0;
+  }
+  #penalty-flash.active { animation: penaltyFlash 0.4s ease; }
+  @keyframes penaltyFlash {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  #win-flash {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,255,106,0.08);
+    pointer-events: none;
+    z-index: 150;
+    opacity: 0;
+  }
+  #win-flash.active { animation: winFlash 0.4s ease; }
+  @keyframes winFlash {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* Disabled hint */
+  #slap-hint {
+    position: absolute;
+    top: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="penalty-flash"></div>
+<div id="win-flash"></div>
+
+<!-- Start Overlay -->
+<div class="overlay" id="start-overlay">
+  <div class="overlay-card">
+    <div class="overlay-title">NEUROJACK</div>
+    <div class="overlay-subtitle">SSVEP · EEG · BCI · SLAPJACK</div>
+    <div class="overlay-desc">
+      A real-time brain-computer interface card game.<br>
+      <strong>Focus on STAY</strong> during normal play.<br>
+      When a <strong style="color:var(--jack-gold)">JACK</strong> appears, shift your gaze to <strong style="color:var(--red)">SLAP</strong>.<br><br>
+      Keyboard: <span class="key-badge">SPACE</span> triggers SLAP &nbsp;·&nbsp; <span class="key-badge">ESC</span> pauses
+    </div>
+    <button class="btn" id="start-btn">START CALIBRATION</button>
+  </div>
+</div>
+
+<!-- Calibration Overlay -->
+<div class="overlay hidden" id="cal-overlay">
+  <div class="overlay-card">
+    <div class="overlay-title" style="font-size:48px">CALIBRATING</div>
+    <div class="overlay-subtitle">EEG BASELINE ACQUISITION</div>
+    <div id="cal-phase">PHASE 1 OF 2 — FOCUS ON STAY (15 Hz)</div>
+    <div id="cal-countdown">10</div>
+    <div id="cal-bar-outer"><div id="cal-bar-fill"></div></div>
+    <div id="cal-status">Acquiring baseline...</div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app">
+
+  <!-- Header -->
+  <div id="header">
+    <div id="logo">NeuroJack <span>v1.0 MVP</span></div>
+    <div class="header-stats">
+      <div class="stat-pill">
+        <span class="stat-label">Round</span>
+        <span class="stat-value" id="round-num">01</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Your Cards</span>
+        <span class="stat-value" id="player-cards">26</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Pile</span>
+        <span class="stat-value amber" id="pile-count">0</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Score</span>
+        <span class="stat-value" id="score-val">0</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Best RT</span>
+        <span class="stat-value" id="best-rt">—</span>
+      </div>
+    </div>
+    <div style="font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:1px; text-align:right;">
+      <div id="clock-display">--:--:--</div>
+      <div style="margin-top:2px;" id="status-label">READY</div>
+    </div>
+  </div>
+
+  <!-- Left Panel -->
+  <div id="left-panel">
+    <div class="panel-title">FFT · EEG SIGNAL</div>
+    <canvas id="fft-canvas" width="260" height="160"></canvas>
+    <div class="freq-bars">
+      <div class="freq-row">
+        <div class="freq-header">
+          <span class="freq-name">STAY / IDLE</span>
+          <span class="freq-hz idle">15 Hz</span>
+        </div>
+        <div class="freq-bar-bg"><div class="freq-bar-fill idle" id="bar-idle" style="width:60%"></div></div>
+      </div>
+      <div class="freq-row">
+        <div class="freq-header">
+          <span class="freq-name">SLAP TARGET</span>
+          <span class="freq-hz slap">12 Hz</span>
+        </div>
+        <div class="freq-bar-bg"><div class="freq-bar-fill slap" id="bar-slap" style="width:20%"></div></div>
+      </div>
+      <div class="freq-row" style="margin-top:4px;">
+        <div class="freq-header">
+          <span class="freq-name">SNR QUALITY</span>
+          <span class="freq-hz idle" id="snr-label">12.4 dB</span>
+        </div>
+        <div class="freq-bar-bg"><div class="freq-bar-fill idle" id="bar-snr" style="width:74%"></div></div>
+      </div>
+    </div>
+    <div class="confidence-section">
+      <div class="confidence-label">Classification Confidence</div>
+      <div id="confidence-meter">
+        <div id="confidence-fill"></div>
+        <span id="confidence-value">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Area -->
+  <div id="game-area">
+    <div id="slap-hint">SPACE = SLAP</div>
+
+    <div id="card-table">
+      <div id="deck-area">
+        <!-- Draw pile -->
+        <div>
+          <div class="pile-label">DRAW PILE</div>
+          <div class="card-stack" id="draw-pile">
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+            <div class="card-back"></div>
+          </div>
+          <div class="deck-count" id="draw-count" style="margin-top:8px; text-align:center;">26 cards</div>
+        </div>
+
+        <!-- Active card -->
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <div class="pile-label">CURRENT CARD</div>
+          <div id="active-card">
+            <div class="card-rank" id="card-rank">A</div>
+            <div class="card-suit" id="card-suit">♠</div>
+            <div class="card-corner tl" id="card-corner-tl">A<br><span class="card-corner-suit">♠</span></div>
+            <div class="card-corner br" id="card-corner-br">A<br><span class="card-corner-suit">♠</span></div>
+          </div>
+          <div id="reaction-ring"></div>
+        </div>
+
+        <!-- Win pile -->
+        <div>
+          <div class="pile-label">WIN PILE</div>
+          <div class="card-stack" id="win-pile">
+            <div class="card-back" style="opacity:0.3;"></div>
+          </div>
+          <div class="deck-count" id="win-count" style="margin-top:8px; text-align:center;">0 cards</div>
+        </div>
+      </div>
+
+      <div id="win-count-display" id="win-msg"></div>
+    </div>
+
+    <!-- Jack text overlay -->
+    <div id="jack-overlay">
+      <div id="jack-text">JACK!</div>
+    </div>
+
+    <!-- Slap feedback overlay -->
+    <div id="slap-feedback">
+      <div id="slap-word">SLAP!</div>
+    </div>
+
+    <!-- Big bg round number -->
+    <div id="round-timer">01</div>
+  </div>
+
+  <!-- Log Panel -->
+  <div id="log-panel">
+    <div class="panel-title">REACTION LOG</div>
+    <div id="log-list">
+      <div style="color:var(--muted); text-align:center; font-family:'Share Tech Mono',monospace; font-size:11px; margin-top:20px; letter-spacing:1px;">
+        NO EVENTS YET
+      </div>
+    </div>
+  </div>
+
+  <!-- Stimulus Bar (bottom) -->
+  <div id="stimulus-bar">
+    <div class="stimulus-box" id="stim-idle">
+      <div class="flicker-layer" id="flicker-idle"></div>
+      <div class="stim-label">STAY</div>
+      <div class="stim-freq">15 Hz · IDLE STATE</div>
+      <div class="stim-hint">FOCUS HERE NORMALLY</div>
+    </div>
+
+    <div class="stimulus-box" id="stim-slap">
+      <div class="flicker-layer" id="flicker-slap"></div>
+      <div class="stim-label">SLAP</div>
+      <div class="stim-freq">12 Hz · TRIGGER</div>
+      <div class="stim-hint">SHIFT GAZE WHEN JACK APPEARS</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── Cursor ───────────────────────────────────────────────────────────────────
+const cursor = document.getElementById('cursor');
+document.addEventListener('mousemove', e => {
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top = e.clientY + 'px';
+});
+
+// ─── Clock ────────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock-display').textContent =
+    now.toLocaleTimeString('en-US', { hour12: false });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── SSVEP Stimulus Flickering ────────────────────────────────────────────────
+// 12 Hz = period 83.33ms  |  15 Hz = period 66.67ms
+const SLAP_FREQ = 12;   // Hz
+const IDLE_FREQ = 15;   // Hz
+
+let flickerIdleState = true;
+let flickerSlapState = true;
+let lastIdleFlip = 0;
+let lastSlapFlip = 0;
+const idlePeriodHalf = 1000 / (IDLE_FREQ * 2);
+const slapPeriodHalf = 1000 / (SLAP_FREQ * 2);
+
+const flickerIdle = document.getElementById('flicker-idle');
+const flickerSlap = document.getElementById('flicker-slap');
+
+function runFlicker(ts) {
+  if (ts - lastIdleFlip >= idlePeriodHalf) {
+    flickerIdleState = !flickerIdleState;
+    flickerIdle.style.opacity = flickerIdleState ? '1' : '0';
+    lastIdleFlip = ts;
+  }
+  if (ts - lastSlapFlip >= slapPeriodHalf) {
+    flickerSlapState = !flickerSlapState;
+    flickerSlap.style.opacity = flickerSlapState ? '1' : '0';
+    lastSlapFlip = ts;
+  }
+  requestAnimationFrame(runFlicker);
+}
+requestAnimationFrame(runFlicker);
+
+// ─── Card Engine ──────────────────────────────────────────────────────────────
+const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const SUITS = ['♠','♥','♦','♣'];
+const RED_SUITS = ['♥','♦'];
+
+function buildDeck() {
+  const deck = [];
+  for (const suit of SUITS)
+    for (const rank of RANKS)
+      deck.push({ rank, suit });
+  return deck;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ─── Game State ───────────────────────────────────────────────────────────────
+let deck = [];
+let pile = [];
+let playerCards = 0;
+let winCards = 0;
+let score = 0;
+let round = 0;
+let currentCard = null;
+let isJack = false;
+let jackWindow = false;
+let jackWindowTimer = null;
+let jackAppearTime = null;
+let bestRT = Infinity;
+let flipInterval = null;
+let gameRunning = false;
+let testNumber = 0;
+let logFirstEntry = true;
+
+// simulated EEG confidence
+let simConfidence = 0.15;
+let simConfidenceTarget = 0.15;
+let simSlapActive = false;
+
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
+const activeCard = document.getElementById('active-card');
+const cardRank = document.getElementById('card-rank');
+const cardSuit = document.getElementById('card-suit');
+const cardCornerTL = document.getElementById('card-corner-tl');
+const cardCornerBR = document.getElementById('card-corner-br');
+const jackOverlay = document.getElementById('jack-overlay');
+const slapFeedback = document.getElementById('slap-feedback');
+const slapWord = document.getElementById('slap-word');
+const reactionRing = document.getElementById('reaction-ring');
+const barIdle = document.getElementById('bar-idle');
+const barSlap = document.getElementById('bar-slap');
+const barSnr = document.getElementById('bar-snr');
+const snrLabel = document.getElementById('snr-label');
+const confFill = document.getElementById('confidence-fill');
+const confValue = document.getElementById('confidence-value');
+const statusLabel = document.getElementById('status-label');
+const logList = document.getElementById('log-list');
+
+function updateCard(card) {
+  const isRed = RED_SUITS.includes(card.suit);
+  const cls = isRed ? 'red-suit' : '';
+  cardRank.textContent = card.rank;
+  cardRank.className = 'card-rank ' + cls;
+  cardSuit.textContent = card.suit;
+  cardSuit.className = 'card-suit ' + cls;
+  cardCornerTL.innerHTML = `${card.rank}<br><span class="card-corner-suit ${cls}">${card.suit}</span>`;
+  cardCornerBR.innerHTML = `${card.rank}<br><span class="card-corner-suit ${cls}">${card.suit}</span>`;
+  cardCornerTL.className = 'card-corner tl ' + cls;
+  cardCornerBR.className = 'card-corner br ' + cls;
+}
+
+function flipCard() {
+  if (!gameRunning) return;
+
+  if (deck.length === 0) {
+    if (pile.length > 0) {
+      deck = shuffle([...pile]);
+      pile = [];
+      document.getElementById('pile-count').textContent = 0;
+    } else {
+      endGame();
+      return;
+    }
+  }
+
+  currentCard = deck.pop();
+  pile.push(currentCard);
+  isJack = currentCard.rank === 'J';
+  round++;
+
+  // Animate
+  activeCard.classList.add('flip');
+  setTimeout(() => activeCard.classList.remove('flip'), 300);
+
+  if (isJack) {
+    activeCard.classList.add('jack');
+  } else {
+    activeCard.classList.remove('jack');
+  }
+
+  updateCard(currentCard);
+
+  // Update counts
+  document.getElementById('draw-count').textContent = deck.length + ' cards';
+  document.getElementById('pile-count').textContent = pile.length;
+  document.getElementById('round-num').textContent = String(round).padStart(2,'0');
+  document.getElementById('round-timer').textContent = String(round).padStart(2,'0');
+
+  if (isJack) {
+    openJackWindow();
+  } else {
+    closeJackWindow();
+  }
+
+  // Start EEG sim: idle stays high
+  simSlapActive = false;
+  simConfidenceTarget = 0.12 + Math.random() * 0.15;
+}
+
+function openJackWindow() {
+  jackWindow = true;
+  jackAppearTime = performance.now();
+  jackOverlay.classList.add('visible');
+  reactionRing.classList.add('active');
+  statusLabel.textContent = 'JACK — SLAP NOW!';
+
+  // Simulate EEG responding
+  simSlapActive = true;
+  simConfidenceTarget = 0.55 + Math.random() * 0.35;
+
+  jackWindowTimer = setTimeout(() => {
+    if (jackWindow) {
+      // Missed!
+      closeJackWindow();
+      logEvent('miss', round, null);
+      statusLabel.textContent = 'MISSED!';
+      setTimeout(() => { if (gameRunning) statusLabel.textContent = 'PLAYING'; }, 1200);
+    }
+  }, 2000);
+}
+
+function closeJackWindow() {
+  jackWindow = false;
+  jackOverlay.classList.remove('visible');
+  reactionRing.classList.remove('active');
+  activeCard.classList.remove('jack');
+  clearTimeout(jackWindowTimer);
+  simSlapActive = false;
+  simConfidenceTarget = 0.12 + Math.random() * 0.15;
+}
+
+function triggerSlap() {
+  if (!gameRunning) return;
+
+  const rt = jackAppearTime ? performance.now() - jackAppearTime : null;
+
+  if (isJack && jackWindow) {
+    // WIN
+    const rtSec = rt / 1000;
+    if (rt < bestRT) {
+      bestRT = rt;
+      document.getElementById('best-rt').textContent = rtSec.toFixed(2) + 's';
+    }
+    score += Math.max(1, Math.floor(10 - rt / 200));
+    winCards += pile.length;
+    pile = [];
+    closeJackWindow();
+    showSlapFeedback('win');
+    flashWin();
+    logEvent('win', round, rtSec);
+    document.getElementById('score-val').textContent = score;
+    document.getElementById('win-count').textContent = winCards + ' cards';
+    document.getElementById('pile-count').textContent = 0;
+    statusLabel.textContent = 'SLAP! +' + Math.max(1, Math.floor(10 - rt / 200)) + ' pts';
+    setTimeout(() => { if (gameRunning) statusLabel.textContent = 'PLAYING'; }, 800);
+  } else if (!isJack && gameRunning) {
+    // PENALTY — false positive
+    score = Math.max(0, score - 3);
+    playerCards = Math.max(0, playerCards - 3);
+    showSlapFeedback('lose');
+    flashPenalty();
+    logEvent('false', round, null);
+    document.getElementById('score-val').textContent = score;
+    document.getElementById('player-cards').textContent = playerCards;
+    statusLabel.textContent = 'FALSE SLAP! −3 pts';
+    setTimeout(() => { if (gameRunning) statusLabel.textContent = 'PLAYING'; }, 800);
+  }
+}
+
+function showSlapFeedback(type) {
+  slapFeedback.className = '';
+  slapWord.className = '';
+  void slapFeedback.offsetWidth; // reflow
+  slapFeedback.classList.add(type);
+  slapWord.textContent = type === 'win' ? 'SLAP!' : 'PENALTY!';
+  slapWord.classList.add(type);
+}
+
+function flashPenalty() {
+  const el = document.getElementById('penalty-flash');
+  el.classList.remove('active');
+  void el.offsetWidth;
+  el.classList.add('active');
+}
+
+function flashWin() {
+  const el = document.getElementById('win-flash');
+  el.classList.remove('active');
+  void el.offsetWidth;
+  el.classList.add('active');
+}
+
+function logEvent(type, rnd, rt) {
+  testNumber++;
+  if (logFirstEntry) {
+    logList.innerHTML = '';
+    logFirstEntry = false;
+  }
+
+  const item = document.createElement('div');
+  item.className = 'log-item ' + (type === 'win' ? 'win' : type === 'miss' ? 'miss' : 'lose');
+
+  let rtStr = '—';
+  let rtClass = 'miss';
+  if (rt !== null) {
+    rtStr = rt.toFixed(3) + 's';
+    rtClass = type === 'win' ? 'win' : 'lose';
+  }
+
+  const eventText = {
+    win: '✓ SLAP DETECTED',
+    miss: '✗ MISSED JACK',
+    false: '✗ FALSE POSITIVE'
+  }[type];
+
+  item.innerHTML = `
+    <div class="log-round">#${testNumber} · ROUND ${rnd}</div>
+    <div class="log-event">${eventText}</div>
+    <div class="log-rt ${rtClass}">RT: ${rtStr}</div>
+  `;
+
+  logList.insertBefore(item, logList.firstChild);
+}
+
+function endGame() {
+  gameRunning = false;
+  clearInterval(flipInterval);
+  statusLabel.textContent = 'GAME OVER';
+}
+
+// ─── FFT Canvas Simulation ────────────────────────────────────────────────────
+const fftCanvas = document.getElementById('fft-canvas');
+const fftCtx = fftCanvas.getContext('2d');
+
+let fftPhase = 0;
+let fftNoise = Array.from({length: 130}, () => Math.random() * 0.3);
+
+function drawFFT() {
+  const W = fftCanvas.width, H = fftCanvas.height;
+  fftCtx.clearRect(0, 0, W, H);
+
+  // BG
+  fftCtx.fillStyle = '#0d1410';
+  fftCtx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  fftCtx.strokeStyle = 'rgba(26,46,30,0.8)';
+  fftCtx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = (H / 4) * i;
+    fftCtx.beginPath();
+    fftCtx.moveTo(0, y);
+    fftCtx.lineTo(W, y);
+    fftCtx.stroke();
+  }
+
+  // Freq labels
+  fftCtx.fillStyle = '#3a5244';
+  fftCtx.font = '8px Share Tech Mono';
+  fftCtx.fillText('5Hz', 4, H - 2);
+  fftCtx.fillText('20Hz', W/2 - 10, H - 2);
+  fftCtx.fillText('40Hz', W - 30, H - 2);
+
+  // Evolve noise
+  fftNoise = fftNoise.map(v => Math.max(0, Math.min(1, v + (Math.random() - 0.5) * 0.08)));
+
+  // Draw baseline spectrum
+  fftCtx.beginPath();
+  fftCtx.strokeStyle = 'rgba(0,255,106,0.25)';
+  fftCtx.lineWidth = 1.5;
+  for (let x = 0; x < W; x++) {
+    const t = x / W;
+    const noise = fftNoise[Math.floor(t * fftNoise.length)] || 0;
+    const y = H - (noise * H * 0.25 + 4);
+    if (x === 0) fftCtx.moveTo(x, y);
+    else fftCtx.lineTo(x, y);
+  }
+  fftCtx.stroke();
+
+  // 15 Hz peak (idle - ~x=91/260 ≈ 35% from left, mapping 5-40Hz range)
+  // x position: (freq - 5) / 35 * W
+  const idleX = ((15 - 5) / 35) * W;
+  const slapX = ((12 - 5) / 35) * W;
+
+  const idleHeight = (simSlapActive ? 0.35 + Math.random() * 0.1 : 0.7 + Math.random() * 0.15);
+  const slapHeight = (simSlapActive ? 0.75 + Math.random() * 0.15 : 0.2 + Math.random() * 0.08);
+
+  // Draw idle peak (green)
+  drawPeak(fftCtx, idleX, idleHeight, H, W, '#00ff6a', 12);
+  // Draw slap peak (red)
+  drawPeak(fftCtx, slapX, slapHeight, H, W, '#ff3a3a', 10);
+
+  // Freq markers
+  fftCtx.strokeStyle = 'rgba(0,255,106,0.3)';
+  fftCtx.setLineDash([3,4]);
+  fftCtx.lineWidth = 1;
+  fftCtx.beginPath();
+  fftCtx.moveTo(idleX, 0);
+  fftCtx.lineTo(idleX, H);
+  fftCtx.stroke();
+
+  fftCtx.strokeStyle = 'rgba(255,58,58,0.3)';
+  fftCtx.beginPath();
+  fftCtx.moveTo(slapX, 0);
+  fftCtx.lineTo(slapX, H);
+  fftCtx.stroke();
+  fftCtx.setLineDash([]);
+
+  fftPhase++;
+}
+
+function drawPeak(ctx, cx, strength, H, W, color, peakW) {
+  ctx.beginPath();
+  const gradient = ctx.createLinearGradient(0, H * (1 - strength), 0, H);
+  gradient.addColorStop(0, color);
+  gradient.addColorStop(1, color + '00');
+  ctx.fillStyle = gradient;
+
+  for (let dx = -peakW * 2; dx <= peakW * 2; dx++) {
+    const x = cx + dx;
+    const gauss = Math.exp(-(dx * dx) / (2 * peakW * peakW * 0.4));
+    const barH = gauss * strength * H * 0.85;
+    if (dx === -peakW * 2) ctx.moveTo(x, H);
+    ctx.lineTo(x, H - barH);
+  }
+  ctx.lineTo(cx + peakW * 2, H);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  for (let dx = -peakW * 2; dx <= peakW * 2; dx++) {
+    const x = cx + dx;
+    const gauss = Math.exp(-(dx * dx) / (2 * peakW * peakW * 0.4));
+    const barH = gauss * strength * H * 0.85;
+    if (dx === -peakW * 2) ctx.moveTo(x, H - barH);
+    else ctx.lineTo(x, H - barH);
+  }
+  ctx.stroke();
+}
+
+// ─── Signal simulation update ────────────────────────────────────────────────
+function updateSignalUI() {
+  // Smoothly approach target confidence
+  simConfidence += (simConfidenceTarget - simConfidence) * 0.08;
+  simConfidence = Math.max(0, Math.min(1, simConfidence + (Math.random() - 0.5) * 0.02));
+
+  const pct = Math.round(simConfidence * 100);
+  confFill.style.width = pct + '%';
+  confValue.textContent = pct + '%';
+
+  // Color confidence based on threshold (0.6)
+  if (pct > 60) {
+    confFill.style.background = 'linear-gradient(90deg, #003311, var(--green))';
+  } else if (pct > 35) {
+    confFill.style.background = 'linear-gradient(90deg, #332200, var(--amber))';
+  } else {
+    confFill.style.background = 'linear-gradient(90deg, #220000, var(--red))';
+  }
+
+  // Bar idle / slap
+  const idlePower = simSlapActive ? 25 + Math.random() * 20 : 55 + Math.random() * 30;
+  const slapPower = simSlapActive ? 60 + Math.random() * 30 : 10 + Math.random() * 20;
+  barIdle.style.width = idlePower + '%';
+  barSlap.style.width = slapPower + '%';
+
+  const snr = 8 + simConfidence * 12 + (Math.random() - 0.5) * 2;
+  snrLabel.textContent = snr.toFixed(1) + ' dB';
+  barSnr.style.width = Math.min(100, snr / 20 * 100) + '%';
+
+  drawFFT();
+
+  requestAnimationFrame(updateSignalUI);
+}
+
+// ─── Calibration ──────────────────────────────────────────────────────────────
+function runCalibration() {
+  const calOverlay = document.getElementById('cal-overlay');
+  calOverlay.classList.remove('hidden');
+
+  const calPhase = document.getElementById('cal-phase');
+  const calCountdown = document.getElementById('cal-countdown');
+  const calBarFill = document.getElementById('cal-bar-fill');
+  const calStatus = document.getElementById('cal-status');
+
+  const totalTime = 10000; // 10s per phase
+  let phase = 1;
+  let elapsed = 0;
+  let startT = performance.now();
+
+  const phases = [
+    { label: 'PHASE 1 OF 2 — FOCUS ON STAY (15 Hz)', status: 'Acquiring idle baseline...' },
+    { label: 'PHASE 2 OF 2 — FOCUS ON SLAP (12 Hz)', status: 'Acquiring SSVEP trigger baseline...' },
+    { label: 'CALIBRATION COMPLETE', status: 'Personalized thresholds computed.' }
+  ];
+
+  function tick(ts) {
+    elapsed = ts - startT;
+    const frac = Math.min(1, elapsed / totalTime);
+    calBarFill.style.width = ((phase - 1 + frac) / 2 * 100) + '%';
+    const remaining = Math.max(0, Math.ceil((totalTime - elapsed) / 1000));
+    calCountdown.textContent = remaining;
+
+    if (elapsed >= totalTime) {
+      phase++;
+      if (phase > 2) {
+        // Done
+        calPhase.textContent = phases[2].label;
+        calStatus.textContent = phases[2].status;
+        calBarFill.style.width = '100%';
+        calCountdown.textContent = '✓';
+        setTimeout(() => {
+          calOverlay.classList.add('hidden');
+          startGame();
+        }, 1200);
+        return;
+      }
+      calPhase.textContent = phases[phase - 1].label;
+      calStatus.textContent = phases[phase - 1].status;
+      startT = ts;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  calPhase.textContent = phases[0].label;
+  calStatus.textContent = phases[0].status;
+  requestAnimationFrame(tick);
+}
+
+// ─── Start Game ───────────────────────────────────────────────────────────────
+function startGame() {
+  deck = shuffle(buildDeck());
+  pile = [];
+  playerCards = 26;
+  winCards = 0;
+  score = 0;
+  round = 0;
+  isJack = false;
+  jackWindow = false;
+  bestRT = Infinity;
+  gameRunning = true;
+  logFirstEntry = true;
+  logList.innerHTML = '<div style="color:var(--muted); text-align:center; font-family:\'Share Tech Mono\',monospace; font-size:11px; margin-top:20px; letter-spacing:1px;">NO EVENTS YET</div>';
+
+  document.getElementById('player-cards').textContent = playerCards;
+  document.getElementById('score-val').textContent = 0;
+  document.getElementById('win-count').textContent = '0 cards';
+  document.getElementById('best-rt').textContent = '—';
+  statusLabel.textContent = 'PLAYING';
+
+  flipCard(); // first card
+  flipInterval = setInterval(flipCard, 1200);
+}
+
+// ─── Keyboard ─────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (gameRunning) triggerSlap();
+  }
+  if (e.code === 'Escape') {
+    if (gameRunning) {
+      gameRunning = false;
+      clearInterval(flipInterval);
+      statusLabel.textContent = 'PAUSED';
+    }
+  }
+});
+
+// ─── Start Button ─────────────────────────────────────────────────────────────
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('start-overlay').classList.add('hidden');
+  runCalibration();
+});
+
+// Stim boxes also trigger slap on click (for testing without keyboard)
+document.getElementById('stim-slap').addEventListener('click', () => {
+  if (gameRunning) triggerSlap();
+});
+
+// ─── Kick off render loop ─────────────────────────────────────────────────────
+requestAnimationFrame(updateSignalUI);
+</script>
+</body>
+</html>
