@@ -88,7 +88,7 @@
   #app {
     display: grid;
     grid-template-columns: 260px 1fr 300px;
-    grid-template-rows: 56px 1fr 180px;
+    grid-template-rows: 56px 1fr 180px; position: relative;
     height: 100vh;
     gap: 0;
   }
@@ -502,7 +502,7 @@
   #slap-word.win { color: var(--green); text-shadow: 0 0 40px var(--green); }
   #slap-word.lose { color: var(--red); text-shadow: 0 0 40px var(--red); }
 
-  /* Bottom: SSVEP stimulus bar */
+  /* Bottom: SSVEP stimulus bar — always visible above calibration overlay */
   #stimulus-bar {
     grid-column: 1 / -1;
     border-top: 1px solid var(--border);
@@ -512,6 +512,9 @@
     gap: 0;
     position: relative;
     overflow: hidden;
+    z-index: 300;
+    height: 180px;
+    min-height: 180px;
   }
 
   .stimulus-box {
@@ -856,6 +859,47 @@
   }
 
   .hidden { display: none !important; }
+
+  /* Stacked card pile */
+  #card-stack-wrap {
+    position: relative;
+    width: 130px;   /* extra space for the offset ghost cards */
+    height: 170px;  /* extra space for vertical offset */
+    margin-bottom: 6px;
+    margin-left: 12px; /* compensate so stack looks centered */
+  }
+
+  .stack-ghost {
+    position: absolute;
+    width: 110px; height: 154px;
+    border-radius: 10px;
+    top: 0; left: 0;
+  }
+
+  /* Ghost 1: furthest back - most offset */
+  .stack-ghost:nth-child(1) {
+    top: 12px; left: -12px;
+    opacity: 0.5;
+    filter: brightness(0.6);
+  }
+
+  /* Ghost 2: middle layer */
+  .stack-ghost:nth-child(2) {
+    top: 6px; left: -6px;
+    opacity: 0.7;
+    filter: brightness(0.8);
+  }
+
+  #card-stack-wrap #active-card {
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 2;
+  }
+
+  #card-stack-wrap #reaction-ring {
+    top: 50%; left: 50%;
+    z-index: 3;
+  }
 </style>
 </head>
 <body>
@@ -879,17 +923,36 @@
   </div>
 </div>
 
-<!-- Calibration Overlay -->
-<div class="overlay hidden" id="cal-overlay">
-  <div class="overlay-card">
-    <div class="overlay-title" style="font-size:48px">CALIBRATING</div>
-    <div class="overlay-subtitle">EEG BASELINE ACQUISITION</div>
-    <div id="cal-phase">PHASE 1 OF 2 — FOCUS ON STAY (15 Hz)</div>
-    <div id="cal-countdown">10</div>
-    <div id="cal-bar-outer"><div id="cal-bar-fill"></div></div>
-    <div id="cal-status">Acquiring baseline...</div>
+<!-- Calibration Overlay — sits over the top 3 grid rows only; stimulus bar (bottom row) stays fully visible and interactive -->
+<div id="cal-overlay" class="hidden" style="
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  bottom: 180px;
+  z-index: 200;
+  background: rgba(8,12,10,0.95);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0;
+">
+  <div style="text-align:center; padding: 40px 60px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel); position:relative; overflow:hidden; max-width:600px; width:90%;">
+    <div style="position:absolute; top:0; left:0; right:0; height:2px; background: linear-gradient(90deg, transparent, var(--green), transparent);"></div>
+    <div class="overlay-title" style="font-size:52px; margin-bottom:4px;">CALIBRATING</div>
+    <div class="overlay-subtitle" style="margin-bottom:24px;">EEG BASELINE ACQUISITION</div>
+    <div id="cal-phase" style="font-family:'Share Tech Mono',monospace; font-size:13px; color:var(--white); letter-spacing:2px; margin-bottom:16px;">PHASE 1 OF 2 — FOCUS ON STAY (15 Hz)</div>
+    <div id="cal-countdown" style="font-family:'Bebas Neue',sans-serif; font-size:88px; color:var(--green); text-shadow: 0 0 30px var(--green); line-height:1; margin-bottom:16px;">10</div>
+    <div id="cal-bar-outer" style="margin:0 0 10px;"><div id="cal-bar-fill"></div></div>
+    <div id="cal-status" style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--muted); letter-spacing:1px; margin-bottom:0;">Acquiring baseline...</div>
+  </div>
+  <div style="margin-top:24px; font-family:'Share Tech Mono',monospace; font-size:12px; color:var(--green); letter-spacing:3px; text-align:center; animation: blink 1s step-end infinite;">
+    ↓ &nbsp; FOCUS ON THE HIGHLIGHTED BOX BELOW &nbsp; ↓
   </div>
 </div>
+<style>
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+</style>
 
 <!-- Main App -->
 <div id="app">
@@ -967,36 +1030,25 @@
 
     <div id="card-table">
       <div id="deck-area">
-        <!-- Draw pile -->
-        <div>
-          <div class="pile-label">DRAW PILE</div>
-          <div class="card-stack" id="draw-pile">
-            <div class="card-back"></div>
-            <div class="card-back"></div>
-            <div class="card-back"></div>
+        <!-- Stacked pile with face card on top -->
+        <div style="display:flex; flex-direction:column; align-items:center; gap:12px;">
+          <div class="pile-label">PLAY PILE</div>
+          <div id="card-stack-wrap">
+            <div class="card-back stack-ghost"></div>
+            <div class="card-back stack-ghost"></div>
+            <div id="active-card">
+              <div class="card-rank" id="card-rank">A</div>
+              <div class="card-suit" id="card-suit">♠</div>
+              <div class="card-corner tl" id="card-corner-tl">A<br><span class="card-corner-suit">♠</span></div>
+              <div class="card-corner br" id="card-corner-br">A<br><span class="card-corner-suit">♠</span></div>
+            </div>
+            <div id="reaction-ring"></div>
           </div>
-          <div class="deck-count" id="draw-count" style="margin-top:8px; text-align:center;">26 cards</div>
-        </div>
-
-        <!-- Active card -->
-        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
-          <div class="pile-label">CURRENT CARD</div>
-          <div id="active-card">
-            <div class="card-rank" id="card-rank">A</div>
-            <div class="card-suit" id="card-suit">♠</div>
-            <div class="card-corner tl" id="card-corner-tl">A<br><span class="card-corner-suit">♠</span></div>
-            <div class="card-corner br" id="card-corner-br">A<br><span class="card-corner-suit">♠</span></div>
+          <div style="display:flex; gap:24px; justify-content:center;">
+            <div class="deck-count">DECK: <span id="draw-count">52</span></div>
+            <div class="deck-count">PILE: <span id="pile-count-el">0</span></div>
+            <div class="deck-count">WON: <span id="win-count">0</span></div>
           </div>
-          <div id="reaction-ring"></div>
-        </div>
-
-        <!-- Win pile -->
-        <div>
-          <div class="pile-label">WIN PILE</div>
-          <div class="card-stack" id="win-pile">
-            <div class="card-back" style="opacity:0.3;"></div>
-          </div>
-          <div class="deck-count" id="win-count" style="margin-top:8px; text-align:center;">0 cards</div>
         </div>
       </div>
 
@@ -1201,8 +1253,8 @@ function flipCard() {
   updateCard(currentCard);
 
   // Update counts
-  document.getElementById('draw-count').textContent = deck.length + ' cards';
-  document.getElementById('pile-count').textContent = pile.length;
+  document.getElementById('draw-count').textContent = deck.length;
+  document.getElementById('pile-count-el').textContent = pile.length;
   document.getElementById('round-num').textContent = String(round).padStart(2,'0');
   document.getElementById('round-timer').textContent = String(round).padStart(2,'0');
 
@@ -1269,8 +1321,8 @@ function triggerSlap() {
     flashWin();
     logEvent('win', round, rtSec);
     document.getElementById('score-val').textContent = score;
-    document.getElementById('win-count').textContent = winCards + ' cards';
-    document.getElementById('pile-count').textContent = 0;
+    document.getElementById('win-count').textContent = winCards;
+    document.getElementById('pile-count-el').textContent = 0;
     statusLabel.textContent = 'SLAP! +' + Math.max(1, Math.floor(10 - rt / 200)) + ' pts';
     setTimeout(() => { if (gameRunning) statusLabel.textContent = 'PLAYING'; }, 800);
   } else if (!isJack && gameRunning) {
@@ -1495,6 +1547,37 @@ function updateSignalUI() {
 }
 
 // ─── Calibration ──────────────────────────────────────────────────────────────
+function setCalStimFocus(phase) {
+  // phase 1 = focus STAY (idle), phase 2 = focus SLAP
+  const idleBox = document.getElementById('stim-idle');
+  const slapBox = document.getElementById('stim-slap');
+  idleBox.style.outline = '';
+  slapBox.style.outline = '';
+  idleBox.style.boxShadow = '';
+  slapBox.style.boxShadow = '';
+  idleBox.style.zIndex = '';
+  slapBox.style.zIndex = '';
+
+  if (phase === 1) {
+    idleBox.style.outline = '3px solid var(--green)';
+    idleBox.style.boxShadow = 'inset 0 0 40px rgba(0,255,106,0.15), 0 0 20px rgba(0,255,106,0.3)';
+    idleBox.style.zIndex = '1';
+  } else {
+    slapBox.style.outline = '3px solid var(--red)';
+    slapBox.style.boxShadow = 'inset 0 0 40px rgba(255,58,58,0.2), 0 0 20px rgba(255,58,58,0.4)';
+    slapBox.style.zIndex = '1';
+  }
+}
+
+function clearCalStimFocus() {
+  const idleBox = document.getElementById('stim-idle');
+  const slapBox = document.getElementById('stim-slap');
+  idleBox.style.outline = '';
+  slapBox.style.outline = '';
+  idleBox.style.boxShadow = '';
+  slapBox.style.boxShadow = '';
+}
+
 function runCalibration() {
   const calOverlay = document.getElementById('cal-overlay');
   calOverlay.classList.remove('hidden');
@@ -1504,16 +1587,18 @@ function runCalibration() {
   const calBarFill = document.getElementById('cal-bar-fill');
   const calStatus = document.getElementById('cal-status');
 
-  const totalTime = 10000; // 10s per phase
+  const totalTime = 10000;
   let phase = 1;
   let elapsed = 0;
   let startT = performance.now();
 
   const phases = [
-    { label: 'PHASE 1 OF 2 — FOCUS ON STAY (15 Hz)', status: 'Acquiring idle baseline...' },
-    { label: 'PHASE 2 OF 2 — FOCUS ON SLAP (12 Hz)', status: 'Acquiring SSVEP trigger baseline...' },
+    { label: 'PHASE 1 OF 2 — FOCUS ON STAY (15 Hz)', status: 'Acquiring idle baseline... Keep eyes on STAY box.' },
+    { label: 'PHASE 2 OF 2 — FOCUS ON SLAP (12 Hz)', status: 'Acquiring SSVEP trigger... Keep eyes on SLAP box.' },
     { label: 'CALIBRATION COMPLETE', status: 'Personalized thresholds computed.' }
   ];
+
+  setCalStimFocus(1);
 
   function tick(ts) {
     elapsed = ts - startT;
@@ -1525,11 +1610,11 @@ function runCalibration() {
     if (elapsed >= totalTime) {
       phase++;
       if (phase > 2) {
-        // Done
         calPhase.textContent = phases[2].label;
         calStatus.textContent = phases[2].status;
         calBarFill.style.width = '100%';
         calCountdown.textContent = '✓';
+        clearCalStimFocus();
         setTimeout(() => {
           calOverlay.classList.add('hidden');
           startGame();
@@ -1538,6 +1623,7 @@ function runCalibration() {
       }
       calPhase.textContent = phases[phase - 1].label;
       calStatus.textContent = phases[phase - 1].status;
+      setCalStimFocus(phase);
       startT = ts;
     }
     requestAnimationFrame(tick);
@@ -1565,12 +1651,12 @@ function startGame() {
 
   document.getElementById('player-cards').textContent = playerCards;
   document.getElementById('score-val').textContent = 0;
-  document.getElementById('win-count').textContent = '0 cards';
+  document.getElementById('win-count').textContent = '0';
   document.getElementById('best-rt').textContent = '—';
   statusLabel.textContent = 'PLAYING';
 
   flipCard(); // first card
-  flipInterval = setInterval(flipCard, 1200);
+  flipInterval = setInterval(flipCard, 3000);
 }
 
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
