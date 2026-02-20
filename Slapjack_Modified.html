@@ -220,7 +220,7 @@
     transition: transform 0.15s ease;
   }
 
-  #active-card.flip { animation: cardFlip 0.9s ease; }
+  #active-card.flip { animation: cardFlip 0.5s ease; }
   @keyframes cardFlip {
     0% { transform: rotateY(0deg) scale(1); }
     45% { transform: rotateY(90deg) scale(0.93); }
@@ -321,10 +321,9 @@
     transition: filter 0.2s ease;
   }
 
-  /* Oldest = most dimmed, newest = brightest */
-  .recent-card#hist-2 { filter: brightness(0.65); }
-  .recent-card#hist-1 { filter: brightness(0.82); }
-  .recent-card#hist-0 { filter: brightness(1);    box-shadow: 0 4px 20px rgba(0,0,0,0.7), 0 0 10px rgba(255,255,255,0.06); }
+  /* Older = more dimmed, newest = brightest */
+  .recent-card#hist-1 { filter: brightness(0.72); }
+  .recent-card#hist-0 { filter: brightness(1); box-shadow: 0 4px 20px rgba(0,0,0,0.7), 0 0 10px rgba(255,255,255,0.06); }
 
   .recent-card.empty-slot {
     background: rgba(255,255,255,0.03);
@@ -680,7 +679,6 @@
         <div id="recent-cards">
           <div class="recent-label">RECENT</div>
           <div id="hist-stack">
-            <div class="recent-card empty-slot" id="hist-2"></div>
             <div class="recent-card empty-slot" id="hist-1"></div>
             <div class="recent-card empty-slot" id="hist-0"></div>
           </div>
@@ -754,7 +752,7 @@ updateClock();
 
 // ─── SSVEP Flickering ────────────────────────────────────────────────────────
 // SLAP box appears/disappears at 10Hz
-const SLAP_FREQ = 8.3;
+const SLAP_FREQ = 10;
 let flickerSlapState = true;
 let lastSlapFlip = 0;
 const slapPeriodHalf = 1000 / (SLAP_FREQ * 2);
@@ -778,12 +776,8 @@ const RED_SUITS = ['♥','♦'];
 function buildDeck() {
   const deck = [];
   for (const suit of SUITS) for (const rank of RANKS) deck.push({rank, suit});
-  // Add extra Jacks so they appear ~3x more often (total 16 Jacks in 64-card deck = 25%)
-  for (const suit of SUITS) {
-    deck.push({rank:'J', suit});
-    deck.push({rank:'J', suit});
-    deck.push({rank:'J', suit});
-  }
+  // One extra Jack per suit — ~15% Jack rate (8 in 60 cards)
+  for (const suit of SUITS) deck.push({rank:'J', suit});
   return deck;
 }
 function shuffle(arr) {
@@ -826,11 +820,10 @@ let recentHistory = []; // newest first, max 3
 
 function renderRecentCards() {
   const RED_SUITS_SET = new Set(['♥','♦']);
-  const ageLabels = ['LATEST', 'PREV', 'OLDER'];
-  // hist-2 = oldest (left), hist-1 = middle, hist-0 = newest (right)
-  for (let i = 0; i < 3; i++) {
+  const ageLabels = ['LATEST', 'PREV'];
+  for (let i = 0; i < 2; i++) {
     const el = document.getElementById('hist-' + i);
-    const card = recentHistory[i]; // i=0 newest
+    const card = recentHistory[i];
     if (!card) {
       el.className = 'recent-card empty-slot';
       el.innerHTML = '';
@@ -850,7 +843,7 @@ function renderRecentCards() {
 
 function pushHistory(card) {
   recentHistory.unshift(card);
-  if (recentHistory.length > 3) recentHistory.length = 3;
+  if (recentHistory.length > 2) recentHistory.length = 2;
   renderRecentCards();
 }
 
@@ -878,18 +871,21 @@ function flipCard() {
     if (pile.length > 0) { deck = shuffle([...pile]); pile = []; document.getElementById('pile-count').textContent = 0; }
     else { endGame(); return; }
   }
+
+  // Push the card that's currently showing into the recent history BEFORE replacing it
+  if (currentCard) pushHistory(currentCard);
+
   currentCard = deck.pop();
   pile.push(currentCard);
   isJack = currentCard.rank === 'J';
   round++;
 
   activeCard.classList.add('flip');
-  setTimeout(() => activeCard.classList.remove('flip'), 900);
+  setTimeout(() => activeCard.classList.remove('flip'), 500);
   if (isJack) activeCard.classList.add('jack');
   else activeCard.classList.remove('jack');
 
   updateCard(currentCard);
-  pushHistory(currentCard);
   document.getElementById('draw-count').textContent = deck.length;
   document.getElementById('pile-count-el').textContent = pile.length;
   document.getElementById('round-num').textContent = String(round).padStart(2,'0');
@@ -1133,7 +1129,7 @@ function startGame() {
   document.getElementById('best-rt').textContent = '—';
   statusLabel.textContent = 'PLAYING';
   flipCard();
-  flipInterval = setInterval(flipCard, 3000);
+  flipInterval = setInterval(flipCard, 1500);
 }
 
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
