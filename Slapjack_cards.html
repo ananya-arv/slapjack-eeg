@@ -598,7 +598,7 @@
     <div class="overlay-subtitle">SSVEP · EEG · BCI · SLAPJACK</div>
     <div class="overlay-desc">
       A real-time brain-computer interface card game.<br>
-      Watch the cards during normal play.<br>
+      The <strong>cards flicker at 2 Hz</strong> — watch them during normal play.<br>
       When a <strong style="color:var(--jack-gold)">JACK</strong> appears, shift your gaze to the <strong style="color:var(--red)">SLAP</strong> box below (10 Hz).<br><br>
       Keyboard: <span class="key-badge">SPACE</span> triggers SLAP &nbsp;·&nbsp; <span class="key-badge">ESC</span> pauses
     </div>
@@ -612,13 +612,13 @@
     <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--green),transparent);"></div>
     <div style="font-family:'Bebas Neue',sans-serif;font-size:56px;letter-spacing:10px;color:var(--green);text-shadow:0 0 40px var(--green);margin-bottom:4px;">CALIBRATING</div>
     <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:4px;color:var(--muted);text-transform:uppercase;margin-bottom:20px;font-weight:700;">EEG BASELINE ACQUISITION</div>
-    <div id="cal-phase" style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--white);letter-spacing:2px;margin-bottom:12px;font-weight:700;">FOCUS ON THE SLAP BOX BELOW (10 Hz)</div>
+    <div id="cal-phase" style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--white);letter-spacing:2px;margin-bottom:12px;font-weight:700;">WATCH THE FLICKERING CARDS (2 Hz)</div>
     <div id="cal-countdown">10</div>
     <div id="cal-bar-outer"><div id="cal-bar-fill"></div></div>
-    <div id="cal-status">Fix your gaze on the red SLAP box below.</div>
+    <div id="cal-status">Fix your gaze on the flickering cards.</div>
   </div>
-  <div id="cal-arrow" style="margin-top:22px;font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--red);letter-spacing:4px;text-align:center;animation:blink 1s step-end infinite;font-weight:700;">
-    ↓ &nbsp; STARE AT THE RED SLAP BOX BELOW &nbsp; ↓
+  <div id="cal-arrow" style="margin-top:22px;font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--green);letter-spacing:4px;text-align:center;animation:blink 1s step-end infinite;font-weight:700;">
+    ↑ &nbsp; WATCH THE FLICKERING CARDS ABOVE &nbsp; ↑
   </div>
 </div>
 
@@ -751,17 +751,25 @@ setInterval(updateClock, 1000);
 updateClock();
 
 // ─── SSVEP Flickering ────────────────────────────────────────────────────────
-// SLAP box appears/disappears at 10Hz
+// Cards flicker at 2Hz, SLAP box at 10Hz — independent timers
+const CARD_FREQ = 2;
 const SLAP_FREQ = 10;
-let flickerSlapState = true;
-let lastSlapFlip = 0;
+let flickerCardState = true, flickerSlapState = true;
+let lastCardFlip = 0, lastSlapFlip = 0;
+const cardPeriodHalf = 1000 / (CARD_FREQ * 2);
 const slapPeriodHalf = 1000 / (SLAP_FREQ * 2);
-const stimSlap = document.getElementById('stim-slap');
 
 function runFlicker(ts) {
+  if (ts - lastCardFlip >= cardPeriodHalf) {
+    flickerCardState = !flickerCardState;
+    const v = flickerCardState ? 'visible' : 'hidden';
+    document.getElementById('card-stack-wrap').style.visibility = v;
+    document.getElementById('hist-stack').style.visibility = v;
+    lastCardFlip = ts;
+  }
   if (ts - lastSlapFlip >= slapPeriodHalf) {
     flickerSlapState = !flickerSlapState;
-    stimSlap.style.visibility = flickerSlapState ? 'visible' : 'hidden';
+    document.getElementById('stim-slap').style.visibility = flickerSlapState ? 'visible' : 'hidden';
     lastSlapFlip = ts;
   }
   requestAnimationFrame(runFlicker);
@@ -1089,11 +1097,12 @@ function runCalibration() {
   calOverlay.classList.remove('hidden');
   const calCountdown = document.getElementById('cal-countdown');
   const calBarFill = document.getElementById('cal-bar-fill');
-  const slapBox = document.getElementById('stim-slap');
 
-  // Highlight the SLAP box
-  slapBox.style.outline = '4px solid #ff6666';
-  slapBox.style.boxShadow = '0 0 40px rgba(255,26,26,0.6), inset 0 0 60px rgba(255,26,26,0.2)';
+  const cardTable = document.getElementById('card-table');
+
+  // Highlight the card area
+  cardTable.style.outline = '4px solid var(--green)';
+  cardTable.style.boxShadow = '0 0 40px rgba(0,255,136,0.4)';
 
   const totalTime = 10000;
   const startT = performance.now();
@@ -1107,8 +1116,8 @@ function runCalibration() {
     if (elapsed >= totalTime) {
       calCountdown.textContent = '✓';
       calBarFill.style.width = '100%';
-      slapBox.style.outline = '';
-      slapBox.style.boxShadow = '';
+      cardTable.style.outline = '';
+      cardTable.style.boxShadow = '';
       setTimeout(() => { calOverlay.classList.add('hidden'); startGame(); }, 1000);
       return;
     }
