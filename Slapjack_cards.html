@@ -122,15 +122,6 @@
   .stat-value.amber { color: var(--amber); text-shadow: 0 0 12px var(--amber); }
   .stat-value.red { color: var(--red); text-shadow: 0 0 12px var(--red); }
 
-  /* Left panel: EEG signal */
-  #left-panel {
-    border-right: 1px solid var(--border);
-    background: var(--panel);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
   .panel-title {
     font-family: 'Share Tech Mono', monospace;
     font-size: 9px;
@@ -142,29 +133,82 @@
     font-weight: 700;
   }
 
-  #fft-canvas { width: 100%; height: 130px; display: block; }
+  /* Left panel: Card Log */
+  #left-panel {
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-  .freq-bars { padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; }
+  #card-log-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    scroll-behavior: smooth;
+  }
+  #card-log-list::-webkit-scrollbar { width: 4px; }
+  #card-log-list::-webkit-scrollbar-thumb { background: var(--green-dim); border-radius: 2px; opacity: 0.5; }
+  #card-log-list::-webkit-scrollbar-track { background: transparent; }
 
-  .freq-row { display: flex; flex-direction: column; gap: 4px; }
-  .freq-header { display: flex; justify-content: space-between; align-items: center; }
-  .freq-name { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; font-weight: 700; }
-  .freq-hz { font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 1px; }
-  .freq-hz.slap { color: var(--red); text-shadow: 0 0 8px var(--red); }
-  .freq-hz.idle { color: var(--green); text-shadow: 0 0 8px var(--green); }
+  .card-log-item {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    animation: logSlide 0.15s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-log-item::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  }
+  .card-log-item.is-jack::before { background: var(--jack-gold); box-shadow: 0 0 6px var(--jack-gold); }
+  .card-log-item.is-sequence::before { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .card-log-item.normal::before { background: var(--border); }
 
-  .freq-bar-bg { height: 10px; background: rgba(255,255,255,0.05); border-radius: 5px; overflow: hidden; }
-  .freq-bar-fill { height: 100%; border-radius: 5px; transition: width 0.08s ease; }
-  .freq-bar-fill.slap { background: linear-gradient(90deg, var(--red-dim), var(--red)); box-shadow: 0 0 10px var(--red); }
-  .freq-bar-fill.idle { background: linear-gradient(90deg, var(--green-dim), var(--green)); box-shadow: 0 0 10px var(--green); }
+  .card-log-rank {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    line-height: 1;
+    color: #111;
+    background: #f0ebe0;
+    border-radius: 4px;
+    width: 40px; height: 40px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .card-log-rank.red-suit { color: #cc0000; }
 
-  .confidence-section { padding: 0 14px 14px; border-top: 1px solid var(--border); margin-top: auto; }
-  .confidence-label { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 2px; color: var(--green); text-transform: uppercase; margin: 10px 0 6px; font-weight: 700; }
+  .card-log-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .card-log-time { color: var(--white); font-size: 10px; letter-spacing: 1px; font-weight: 700; }
+  .card-log-elapsed { color: var(--muted); font-size: 9px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 
-  #confidence-meter { height: 28px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); position: relative; }
-  #confidence-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #001a08, var(--green)); transition: width 0.1s ease; position: relative; }
-  #confidence-fill::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 3px; background: white; box-shadow: 0 0 8px white; }
-  #confidence-value { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-family: 'Bebas Neue', sans-serif; font-size: 16px; color: var(--white); mix-blend-mode: difference; }
+  .card-log-tag {
+    font-size: 8px;
+    letter-spacing: 1px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+  .card-log-tag.jack { color: #111; background: var(--jack-gold); }
+  .card-log-tag.seq  { color: #111; background: var(--amber); }
 
   /* Center: game area */
   #game-area {
@@ -641,30 +685,14 @@
     </div>
   </div>
 
-  <!-- Left Panel -->
+  <!-- Left Panel: Card Log -->
   <div id="left-panel">
-    <div class="panel-title">FFT · EEG SIGNAL</div>
-    <canvas id="fft-canvas" width="220" height="130"></canvas>
-    <div class="freq-bars">
-      <div class="freq-row">
-        <div class="freq-header"><span class="freq-name">STAY / IDLE</span><span class="freq-hz idle">15 Hz</span></div>
-        <div class="freq-bar-bg"><div class="freq-bar-fill idle" id="bar-idle" style="width:60%"></div></div>
-      </div>
-      <div class="freq-row">
-        <div class="freq-header"><span class="freq-name">SLAP TARGET</span><span class="freq-hz slap">10 Hz</span></div>
-        <div class="freq-bar-bg"><div class="freq-bar-fill slap" id="bar-slap" style="width:20%"></div></div>
-      </div>
-      <div class="freq-row" style="margin-top:4px;">
-        <div class="freq-header"><span class="freq-name">SNR QUALITY</span><span class="freq-hz idle" id="snr-label">12.4 dB</span></div>
-        <div class="freq-bar-bg"><div class="freq-bar-fill idle" id="bar-snr" style="width:74%"></div></div>
-      </div>
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>CARD LOG</span>
+      <button onclick="exportCSV()" style="font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:1px;padding:3px 7px;border:1px solid var(--green);background:transparent;color:var(--green);border-radius:2px;cursor:pointer;font-weight:700;">↓ CSV</button>
     </div>
-    <div class="confidence-section">
-      <div class="confidence-label">Classification Confidence</div>
-      <div id="confidence-meter">
-        <div id="confidence-fill"></div>
-        <span id="confidence-value">0%</span>
-      </div>
+    <div id="card-log-list">
+      <div style="color:var(--muted);text-align:center;font-family:'Share Tech Mono',monospace;font-size:10px;margin-top:20px;letter-spacing:1px;font-weight:700;">WAITING...</div>
     </div>
   </div>
 
@@ -801,7 +829,7 @@ let deck=[], pile=[], playerCards=0, winCards=0, score=0, round=0;
 let currentCard=null, isJack=false, jackWindow=false, jackWindowTimer=null;
 let jackAppearTime=null, bestRT=Infinity, flipInterval=null, gameRunning=false;
 let testNumber=0, logFirstEntry=true;
-let simConfidence=0.15, simConfidenceTarget=0.15, simSlapActive=false;
+let gameStartTime = 0;
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const activeCard = document.getElementById('active-card');
@@ -813,14 +841,64 @@ const jackOverlay = document.getElementById('jack-overlay');
 const slapFeedback = document.getElementById('slap-feedback');
 const slapWord = document.getElementById('slap-word');
 const reactionRing = document.getElementById('reaction-ring');
-const barIdle = document.getElementById('bar-idle');
-const barSlap = document.getElementById('bar-slap');
-const barSnr = document.getElementById('bar-snr');
-const snrLabel = document.getElementById('snr-label');
-const confFill = document.getElementById('confidence-fill');
-const confValue = document.getElementById('confidence-value');
 const statusLabel = document.getElementById('status-label');
 const logList = document.getElementById('log-list');
+const cardLogList = document.getElementById('card-log-list');
+
+// ─── Card Log ─────────────────────────────────────────────────────────────────
+let cardLogFirstEntry = true;
+
+// ─── Card Log Data (for CSV export) ──────────────────────────────────────────
+let cardLogData = []; // array of row objects
+
+function addCardLog(card, tags) {
+  if (cardLogFirstEntry) {
+    cardLogList.innerHTML = '';
+    cardLogFirstEntry = false;
+  }
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+  const elapsedMs = performance.now() - gameStartTime;
+  const elapsedSec = Math.floor(elapsedMs / 1000);
+  const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+  const ss = String(elapsedSec % 60).padStart(2, '0');
+  const ms = String(Math.floor((elapsedMs % 1000) / 10)).padStart(2, '0');
+  const elapsedStr = `${mm}:${ss}.${ms}`;
+
+  const isRed = ['♥','♦'].includes(card.suit);
+  const rankCls = isRed ? 'red-suit' : '';
+  const suitCount = getSuitCount(card);
+  const tagLabel = tags.includes('jack') ? 'JACK' : tags.includes('seq') ? '3-SUIT' : '';
+
+  // Store for CSV
+  cardLogData.push({
+    round,
+    rank: card.rank,
+    suit: card.suit,
+    time: timeStr,
+    elapsed: elapsedStr,
+    elapsed_ms: Math.round(elapsedMs),
+    suit_count: suitCount,
+    tag: tagLabel
+  });
+
+  let tagHTML = '';
+  if (tags.includes('jack')) tagHTML = `<span class="card-log-tag jack">♛ JACK</span>`;
+  else if (tags.includes('seq')) tagHTML = `<span class="card-log-tag seq">▲ 3×${card.suit}</span>`;
+
+  const item = document.createElement('div');
+  item.className = 'card-log-item ' + (tags.includes('jack') ? 'is-jack' : tags.includes('seq') ? 'is-sequence' : 'normal');
+  item.innerHTML = `
+    <div class="card-log-rank ${rankCls}">${card.rank}<span style="font-size:10px;display:block;line-height:1">${card.suit}</span></div>
+    <div class="card-log-meta">
+      <div class="card-log-time">${timeStr}</div>
+      <div class="card-log-elapsed">+${elapsedStr} &nbsp;<span style="color:${isRed?'#e04444':'var(--muted)'};">${card.suit}×${suitCount}</span>${tagHTML ? ' &nbsp;' + tagHTML : ''}</div>
+    </div>
+  `;
+  cardLogList.appendChild(item);
+  cardLogList.scrollTop = cardLogList.scrollHeight;
+}
 
 
 // ─── Recent card history ─────────────────────────────────────────────────────
@@ -860,6 +938,41 @@ function clearHistory() {
   renderRecentCards();
 }
 
+// ─── Suit Streak Detection ────────────────────────────────────────────────────
+// Trigger when the last 3 cards dealt are all the same suit
+const SUIT_SYMBOL_TO_KEY = { '♠':'spade', '♥':'heart', '♦':'diamond', '♣':'club' };
+let suitStreak = []; // last 3 suits, most recent first
+let isSequence = false;
+
+function checkSuitCount(card) {
+  const key = SUIT_SYMBOL_TO_KEY[card.suit];
+  suitStreak.unshift(key);
+  if (suitStreak.length > 3) suitStreak.length = 3;
+  // Fire when exactly the 3rd card completes a streak (not on 4th, 5th, etc.)
+  if (suitStreak.length === 3 &&
+      suitStreak[0] === suitStreak[1] &&
+      suitStreak[1] === suitStreak[2] &&
+      suitStreak[0] !== undefined) {
+    return true;
+  }
+  return false;
+}
+
+function resetSuitCounts() {
+  suitStreak = [];
+}
+
+function getSuitCount(card) {
+  // Return current streak length for this suit (for display)
+  const key = SUIT_SYMBOL_TO_KEY[card.suit];
+  let count = 0;
+  for (const s of suitStreak) {
+    if (s === key) count++;
+    else break;
+  }
+  return count;
+}
+
 function updateCard(card) {
   const isRed = RED_SUITS.includes(card.suit);
   const cls = isRed ? 'red-suit' : '';
@@ -876,16 +989,21 @@ function updateCard(card) {
 function flipCard() {
   if (!gameRunning) return;
   if (deck.length === 0) {
-    if (pile.length > 0) { deck = shuffle([...pile]); pile = []; document.getElementById('pile-count').textContent = 0; }
-    else { endGame(); return; }
+    if (pile.length > 0) {
+      deck = shuffle(buildDeck());
+      pile = [];
+      resetSuitCounts();
+      document.getElementById('pile-count').textContent = 0;
+    } else { endGame(); return; }
   }
 
-  // Push the card that's currently showing into the recent history BEFORE replacing it
+  // Push currently showing card into recent history BEFORE replacing it
   if (currentCard) pushHistory(currentCard);
 
   currentCard = deck.pop();
   pile.push(currentCard);
   isJack = currentCard.rank === 'J';
+  isSequence = checkSuitCount(currentCard);
   round++;
 
   activeCard.classList.add('flip');
@@ -893,17 +1011,32 @@ function flipCard() {
   if (isJack) activeCard.classList.add('jack');
   else activeCard.classList.remove('jack');
 
+  // Amber glow on sequence (non-Jack)
+  if (isSequence && !isJack) {
+    activeCard.style.boxShadow = '0 0 60px var(--amber), 0 8px 60px rgba(0,0,0,0.7)';
+    activeCard.style.borderColor = 'var(--amber)';
+  } else if (!isJack) {
+    activeCard.style.boxShadow = '';
+    activeCard.style.borderColor = '';
+  }
+
   updateCard(currentCard);
   document.getElementById('draw-count').textContent = deck.length;
   document.getElementById('pile-count-el').textContent = pile.length;
   document.getElementById('round-num').textContent = String(round).padStart(2,'0');
   document.getElementById('round-timer').textContent = String(round).padStart(2,'0');
 
-  if (isJack) openJackWindow();
+  // Build tags for card log
+  const tags = [];
+  if (isJack) tags.push('jack');
+  if (isSequence) tags.push('seq');
+  addCardLog(currentCard, tags);
+
+  if (isJack || isSequence) openJackWindow();
   else closeJackWindow();
 
-  simSlapActive = false;
-  simConfidenceTarget = 0.12 + Math.random() * 0.15;
+  // All cards same duration
+  scheduleNextFlip(FLIP_INTERVAL);
 }
 
 function openJackWindow() {
@@ -911,12 +1044,10 @@ function openJackWindow() {
   jackAppearTime = performance.now();
   jackOverlay.classList.add('visible');
   reactionRing.classList.add('active');
-  statusLabel.textContent = 'JACK — SLAP NOW!';
-  simSlapActive = true;
-  simConfidenceTarget = 0.6 + Math.random() * 0.35;
+  statusLabel.textContent = isSequence && !isJack ? '3-SUIT RUN — SLAP!' : 'JACK — SLAP NOW!';
   jackWindowTimer = setTimeout(() => {
     if (jackWindow) { closeJackWindow(); logEvent('miss', round, null); statusLabel.textContent = 'MISSED!'; setTimeout(() => { if(gameRunning) statusLabel.textContent='PLAYING'; }, 1200); }
-  }, 2000);
+  }, FLIP_INTERVAL - 200);
 }
 
 function closeJackWindow() {
@@ -925,21 +1056,20 @@ function closeJackWindow() {
   reactionRing.classList.remove('active');
   activeCard.classList.remove('jack');
   clearTimeout(jackWindowTimer);
-  simSlapActive = false;
-  simConfidenceTarget = 0.12 + Math.random() * 0.15;
 }
 
 function triggerSlap() {
   if (!gameRunning) return;
   const rt = jackAppearTime ? performance.now() - jackAppearTime : null;
 
-  if (isJack && jackWindow) {
+  if ((isJack || isSequence) && jackWindow) {
     const rtSec = rt / 1000;
     if (rt < bestRT) { bestRT = rt; document.getElementById('best-rt').textContent = rtSec.toFixed(2) + 's'; }
     const pts = Math.max(1, Math.floor(10 - rt / 200));
     score += pts;
     winCards += pile.length;
     pile = [];
+    resetSuitCounts();
     closeJackWindow();
     showSlapFeedback('win');
     flashWin();
@@ -949,7 +1079,7 @@ function triggerSlap() {
     document.getElementById('pile-count-el').textContent = 0;
     statusLabel.textContent = 'SLAP! +' + pts + ' pts';
     setTimeout(() => { if(gameRunning) statusLabel.textContent='PLAYING'; }, 800);
-  } else if (!isJack && gameRunning) {
+  } else if (!isJack && !isSequence && gameRunning) {
     score = Math.max(0, score - 3);
     playerCards = Math.max(0, playerCards - 3);
     showSlapFeedback('lose');
@@ -998,98 +1128,6 @@ function endGame() {
   statusLabel.textContent = 'GAME OVER';
 }
 
-// ─── FFT Canvas Simulation ────────────────────────────────────────────────────
-const fftCanvas = document.getElementById('fft-canvas');
-const fftCtx = fftCanvas.getContext('2d');
-let fftNoise = Array.from({length: 110}, () => Math.random() * 0.3);
-
-function drawFFT() {
-  const W = fftCanvas.width, H = fftCanvas.height;
-  fftCtx.clearRect(0, 0, W, H);
-  fftCtx.fillStyle = '#080f0d';
-  fftCtx.fillRect(0, 0, W, H);
-
-  fftCtx.strokeStyle = 'rgba(14,36,25,0.9)';
-  fftCtx.lineWidth = 1;
-  for (let i=0; i<=4; i++) {
-    fftCtx.beginPath(); fftCtx.moveTo(0,(H/4)*i); fftCtx.lineTo(W,(H/4)*i); fftCtx.stroke();
-  }
-
-  fftCtx.fillStyle = '#2a6644';
-  fftCtx.font = 'bold 8px Share Tech Mono';
-  fftCtx.fillText('5Hz', 3, H-2);
-  fftCtx.fillText('20Hz', W/2-12, H-2);
-  fftCtx.fillText('40Hz', W-32, H-2);
-
-  fftNoise = fftNoise.map(v => Math.max(0, Math.min(1, v + (Math.random()-0.5)*0.09)));
-
-  fftCtx.beginPath();
-  fftCtx.strokeStyle = 'rgba(0,255,136,0.2)';
-  fftCtx.lineWidth = 1.5;
-  for (let x=0; x<W; x++) {
-    const t = x/W;
-    const noise = fftNoise[Math.floor(t*fftNoise.length)]||0;
-    const y = H - (noise*H*0.22+4);
-    if (x===0) fftCtx.moveTo(x,y); else fftCtx.lineTo(x,y);
-  }
-  fftCtx.stroke();
-
-  const idleX = ((15-5)/35)*W;
-  const slapX = ((10-5)/35)*W; // 10 Hz
-  const idleHeight = simSlapActive ? 0.30+Math.random()*0.1 : 0.72+Math.random()*0.15;
-  const slapHeight = simSlapActive ? 0.78+Math.random()*0.15 : 0.18+Math.random()*0.08;
-
-  drawPeak(fftCtx, idleX, idleHeight, H, W, '#00ff88', 12);
-  drawPeak(fftCtx, slapX, slapHeight, H, W, '#ff1a1a', 10);
-
-  fftCtx.strokeStyle='rgba(0,255,136,0.35)'; fftCtx.setLineDash([3,4]); fftCtx.lineWidth=1;
-  fftCtx.beginPath(); fftCtx.moveTo(idleX,0); fftCtx.lineTo(idleX,H); fftCtx.stroke();
-  fftCtx.strokeStyle='rgba(255,26,26,0.35)';
-  fftCtx.beginPath(); fftCtx.moveTo(slapX,0); fftCtx.lineTo(slapX,H); fftCtx.stroke();
-  fftCtx.setLineDash([]);
-}
-
-function drawPeak(ctx, cx, strength, H, W, color, peakW) {
-  ctx.beginPath();
-  const gradient = ctx.createLinearGradient(0, H*(1-strength), 0, H);
-  gradient.addColorStop(0, color);
-  gradient.addColorStop(1, color+'00');
-  ctx.fillStyle = gradient;
-  for (let dx=-peakW*2; dx<=peakW*2; dx++) {
-    const x=cx+dx, gauss=Math.exp(-(dx*dx)/(2*peakW*peakW*0.4)), barH=gauss*strength*H*0.85;
-    if(dx===-peakW*2) ctx.moveTo(x,H); ctx.lineTo(x,H-barH);
-  }
-  ctx.lineTo(cx+peakW*2,H); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=1.5;
-  for (let dx=-peakW*2; dx<=peakW*2; dx++) {
-    const x=cx+dx, gauss=Math.exp(-(dx*dx)/(2*peakW*peakW*0.4)), barH=gauss*strength*H*0.85;
-    if(dx===-peakW*2) ctx.moveTo(x,H-barH); else ctx.lineTo(x,H-barH);
-  }
-  ctx.stroke();
-}
-
-function updateSignalUI() {
-  simConfidence += (simConfidenceTarget - simConfidence) * 0.08;
-  simConfidence = Math.max(0, Math.min(1, simConfidence + (Math.random()-0.5)*0.02));
-  const pct = Math.round(simConfidence * 100);
-  confFill.style.width = pct + '%';
-  confValue.textContent = pct + '%';
-  if (pct > 60) confFill.style.background = 'linear-gradient(90deg,#001a08,var(--green))';
-  else if (pct > 35) confFill.style.background = 'linear-gradient(90deg,#332200,var(--amber))';
-  else confFill.style.background = 'linear-gradient(90deg,#220000,var(--red))';
-
-  const idlePower = simSlapActive ? 20+Math.random()*20 : 55+Math.random()*30;
-  const slapPower = simSlapActive ? 62+Math.random()*28 : 10+Math.random()*18;
-  barIdle.style.width = idlePower + '%';
-  barSlap.style.width = slapPower + '%';
-
-  const snr = 8 + simConfidence*12 + (Math.random()-0.5)*2;
-  snrLabel.textContent = snr.toFixed(1) + ' dB';
-  barSnr.style.width = Math.min(100, snr/20*100) + '%';
-
-  drawFFT();
-  requestAnimationFrame(updateSignalUI);
-}
 
 // ─── Calibration ──────────────────────────────────────────────────────────────
 function runCalibration() {
@@ -1129,7 +1167,13 @@ function runCalibration() {
 // ─── Start Game ───────────────────────────────────────────────────────────────
 function startGame() {
   deck = shuffle(buildDeck()); pile = []; playerCards = 26; winCards = 0; score = 0; round = 0;
-  isJack = false; jackWindow = false; bestRT = Infinity; gameRunning = true; logFirstEntry = true;
+  isJack = false; isSequence = false;
+  resetSuitCounts();
+  jackWindow = false; bestRT = Infinity; gameRunning = true; logFirstEntry = true;
+  gameStartTime = performance.now();
+  cardLogData = [];
+  cardLogFirstEntry = true;
+  cardLogList.innerHTML = '<div style="color:var(--muted);text-align:center;font-family:\'Share Tech Mono\',monospace;font-size:10px;margin-top:20px;letter-spacing:1px;font-weight:700;">WAITING...</div>';
   clearHistory();
   logList.innerHTML = '<div style="color:var(--muted);text-align:center;font-family:\'Share Tech Mono\',monospace;font-size:10px;margin-top:20px;letter-spacing:1px;font-weight:700;">NO EVENTS YET</div>';
   document.getElementById('player-cards').textContent = playerCards;
@@ -1150,48 +1194,24 @@ function scheduleNextFlip(delay) {
   flipTimeout = setTimeout(flipCard, delay ?? FLIP_INTERVAL);
 }
 
-function flipCard() {
-  if (!gameRunning) return;
 
-  // Reshuffle pile into a NEW random deck (not same order) when exhausted
-  if (deck.length === 0) {
-    if (pile.length > 0) {
-      deck = shuffle(buildDeck()); // fresh deck, not pile — avoids identical repeat sequence
-      pile = [];
-      document.getElementById('pile-count').textContent = 0;
-    } else { endGame(); return; }
-  }
-
-  // Push the card currently showing into recent history BEFORE replacing it
-  if (currentCard) pushHistory(currentCard);
-
-  currentCard = deck.pop();
-  pile.push(currentCard);
-  isJack = currentCard.rank === 'J';
-  round++;
-
-  activeCard.classList.add('flip');
-  setTimeout(() => activeCard.classList.remove('flip'), 500);
-  if (isJack) activeCard.classList.add('jack');
-  else activeCard.classList.remove('jack');
-
-  updateCard(currentCard);
-  document.getElementById('draw-count').textContent = deck.length;
-  document.getElementById('pile-count-el').textContent = pile.length;
-  document.getElementById('round-num').textContent = String(round).padStart(2,'0');
-  document.getElementById('round-timer').textContent = String(round).padStart(2,'0');
-
-  if (isJack) {
-    openJackWindow();
-    // Hold the Jack on screen for JACK_PAUSE extra ms so EEG spike can be captured
-    scheduleNextFlip(FLIP_INTERVAL + JACK_PAUSE);
-  } else {
-    closeJackWindow();
-    scheduleNextFlip(FLIP_INTERVAL);
-  }
-
-  simSlapActive = false;
-  simConfidenceTarget = 0.12 + Math.random() * 0.15;
+// ─── CSV Export ───────────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!cardLogData.length) { alert('No card data yet — start a game first.'); return; }
+  const headers = ['round','rank','suit','time','elapsed','elapsed_ms','suit_count_in_pile','tag'];
+  const rows = cardLogData.map(r =>
+    [r.round, r.rank, r.suit, r.time, r.elapsed, r.elapsed_ms, r.suit_count, r.tag]
+    .map(v => `"${String(v).replace(/"/g,'""')}"`)
+    .join(',')
+  );
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `neurojack_log_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
@@ -1206,7 +1226,6 @@ document.getElementById('start-btn').addEventListener('click', () => {
 });
 document.getElementById('stim-slap').addEventListener('click', () => { if (gameRunning) triggerSlap(); });
 
-requestAnimationFrame(updateSignalUI);
 </script>
 </body>
 </html>
