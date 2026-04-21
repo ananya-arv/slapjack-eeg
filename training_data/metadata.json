@@ -1,0 +1,41 @@
+{
+  "generated": "2026-04-15T20:50:08.753482",
+  "device": "Unicorn Hybrid Black",
+  "fs": 250,
+  "epoch_sec": 1.0,
+  "n_samples": 250,
+  "channels": [
+    "Fz",
+    "C3",
+    "Cz",
+    "C4",
+    "Pz",
+    "PO7",
+    "Oz",
+    "PO8"
+  ],
+  "ssvep_channels": [
+    "Pz",
+    "PO7",
+    "Oz",
+    "PO8"
+  ],
+  "ssvep_ch_indices": [
+    4,
+    5,
+    6,
+    7
+  ],
+  "freq_baseline_hz": 2.0,
+  "freq_slap_hz": 10.0,
+  "n_features": 19,
+  "sessions": [
+    "unicorn_session_001",
+    "unicorn_session_002",
+    "unicorn_session_003",
+    "unicorn_session_004",
+    "unicorn_session_005"
+  ],
+  "total_trials": 1000,
+  "lsl_notes": "UnicornLSL.exe streams 17ch; use only ch0-7 (EEG). Stream type=EEG, name=UN-XXXX.XX.XX"
+}
